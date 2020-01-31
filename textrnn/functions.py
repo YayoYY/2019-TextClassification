@@ -64,19 +64,30 @@ def process_file(data_dir, text_col, label_col, word_to_id, label_to_id, seq_len
 
     df = pd.read_csv(data_dir)
     texts, labels = df[text_col].to_list(), df[label_col].to_list()
-          
-    text_id, label_id = [], []
+
+    ##### 添加样本权重 #####
+    # text_id, label_id = [], []
+    text_id, label_id, sample_weights = [], [], []
     
     for i in range(len(texts)):
         text_id.append([word_to_id[_] for _ in texts[i] if _ in word_to_id])
         label_id.append(label_to_id[labels[i]])
+        sample_weight = 2 if labels[i] == '寻衅滋事' else 1
+        sample_weights.append(sample_weight)
     
     x_pad = kr.preprocessing.sequence.pad_sequences(text_id, seq_length)
     y_pad = kr.utils.to_categorical(label_id, num_classes=len(label_to_id))
+    sample_weights = np.array(sample_weights).reshape(-1,1)
+    sample_weights = sample_weights / np.sum(sample_weights)
+    # return x_pad, y_pad
+    return x_pad, y_pad, sample_weights
     
-    return x_pad, y_pad
-
-def batch_iter(x, y, batch_size=64):
+    ##### 添加样本权重 #####
+    
+    
+##### 添加样本权重 #####
+# def batch_iter(x, y, batch_size=64):
+def batch_iter(x, y, sw, batch_size=64):
     '''生成批次数据'''
 
     n = len(x)
@@ -84,14 +95,22 @@ def batch_iter(x, y, batch_size=64):
     idxs = np.random.permutation(np.arange(n))
     x_shuffle = x[idxs]
     y_shuffle = y[idxs]
+    sw_shuffle = sw[idxs]
 
     for i in range(num_batch):
         start_idx = i * batch_size
         end_idx = min((i+1) * batch_size, n)
-        yield x_shuffle[start_idx:end_idx], y_shuffle[start_idx:end_idx]
+        # yield x_shuffle[start_idx:end_idx], y_shuffle[start_idx:end_idx]
+        yield x_shuffle[start_idx:end_idx], y_shuffle[start_idx:end_idx], sw_shuffle[start_idx:end_idx]
+##### 添加样本权重 #####
+
 
 @logtime
-def train(model, x_train, y_train, x_dev, y_dev):
+
+# def train(model, x_train, y_train, x_dev, y_dev):
+def train(model, x_train, y_train, x_dev, y_dev, sw_train):
+##### 添加样本权重 #####
+
     '''训练'''
     
     tensorboard_dir = 'tensorboard/textrnn'
@@ -122,12 +141,22 @@ def train(model, x_train, y_train, x_dev, y_dev):
     for epoch in range(model.config.num_epochs):
         print('Epoch:', epoch + 1)
         
-        batch_train = batch_iter(x_train, y_train, model.config.batch_size)
+        ##### 添加样本权重 #####
+        # batch_train = batch_iter(x_train, y_train, model.config.batch_size)
+        batch_train = batch_iter(x_train, y_train, sw_train, model.config.batch_size)
+        ##### 添加样本权重 #####
 
-        for x_batch, y_batch in batch_train:
+        ##### 添加样本权重 #####
+        # for x_batch, y_batch in batch_train:
+        for x_batch, y_batch, sw_batch in batch_train:
+        ##### 添加样本权重 #####
 
-            feed_dict = {model.input_x: x_batch, model.input_y: y_batch, model.keep_prob: model.config.dropout_keep_prob}
+            ##### 添加样本权重 #####
+            # feed_dict = {model.input_x: x_batch, model.input_y: y_batch, model.keep_prob: model.config.dropout_keep_prob}
+            feed_dict = {model.input_x: x_batch, model.input_y: y_batch, 
+            model.keep_prob: model.config.dropout_keep_prob, model.sample_weights: sw_batch}
             sess.run(model.optim, feed_dict=feed_dict)
+            ##### 添加样本权重 #####
 
             if batch % model.config.save_per_batch == 0:
 
@@ -138,6 +167,10 @@ def train(model, x_train, y_train, x_dev, y_dev):
 
                 feed_dict[model.keep_prob] = 1.0
                 loss_train, acc_train = sess.run([model.loss, model.acc], feed_dict=feed_dict)
+
+                ##### 添加样本权重 #####
+                loss_train_modified = sess.run(model.loss_with_sample_weights, feed_dict=feed_dict)
+                ##### 添加样本权重 #####
 
                 feed_dict[model.input_x] = x_dev
                 feed_dict[model.input_y] = y_dev
@@ -153,6 +186,10 @@ def train(model, x_train, y_train, x_dev, y_dev):
                 + ' Val Loss: {3:>6.2}, Val Acc: {4:>7.2%}'
                 print(msg.format(batch, loss_train, acc_train, loss_dev, acc_dev))
 
+                ##### 添加样本权重 #####
+                msg = 'Modified Train Loss: {0:>6.2}'
+                print(msg.format(loss_train_modified))
+                ##### 添加样本权重 #####
 
             batch += 1
 

@@ -23,11 +23,20 @@ if __name__ == '__main__':
 
 	model = TextRNN(config)
 
-	x_train, y_train = process_file(train_dir, 'fact', 'accusation', word_to_id, label_to_id, config.seq_length)
-	x_dev, y_dev = process_file(dev_dir, 'fact', 'accusation', word_to_id, label_to_id, config.seq_length)
-	x_test, y_test = process_file(test_dir, 'fact', 'accusation', word_to_id, label_to_id, config.seq_length)
+	##### 添加样本权重 #####
+	# x_train, y_train = process_file(train_dir, 'fact', 'accusation', word_to_id, label_to_id, config.seq_length)
+	# x_dev, y_dev = process_file(dev_dir, 'fact', 'accusation', word_to_id, label_to_id, config.seq_length)
+	# x_test, y_test = process_file(test_dir, 'fact', 'accusation', word_to_id, label_to_id, config.seq_length)
+
+	x_train, y_train, sw_train = process_file(train_dir, 'fact', 'accusation', word_to_id, label_to_id, config.seq_length)
+	x_dev, y_dev, sw_dev = process_file(dev_dir, 'fact', 'accusation', word_to_id, label_to_id, config.seq_length)
+	x_test, y_test, sw_test = process_file(test_dir, 'fact', 'accusation', word_to_id, label_to_id, config.seq_length)
 
 	# train(model, x_train, y_train, x_dev, y_dev)
+	train(model, x_train, y_train, x_dev, y_dev, sw_train)
+
+	##### 添加样本权重 #####
+
 	y_pred_cls = test(model, x_test, y_test)
 
 	labels = ['危险驾驶', '交通肇事', '盗窃', '信用卡诈骗', 

@@ -32,6 +32,9 @@ class TextRNN(object):
         self.config = config
         self.input_x = tf.placeholder(tf.int32, [None, self.config.seq_length], name='input_x')
         self.input_y = tf.placeholder(tf.float32, [None, self.config.num_classes], name='input_y')
+        ##### 添加样本权重 #####
+        self.sample_weights = tf.placeholder(tf.float32, [None, 1], name='sample_weights')
+        ##### 添加样本权重 #####
         self.keep_prob = tf.placeholder(tf.float32, name='keep_prob')
         self.rnn()
 
@@ -72,7 +75,12 @@ class TextRNN(object):
         with tf.name_scope('optimize'):
             self.cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=self.logits, labels=self.input_y)
             self.loss = tf.reduce_mean(self.cross_entropy)
-            self.optim = tf.train.AdamOptimizer(learning_rate=self.config.learning_rate).minimize(self.loss)
+            ##### 添加样本权重 #####
+            self.cross_entropy_with_sample_weights = tf.multiply(self.sample_weights, self.cross_entropy)
+            self.loss_with_sample_weights = tf.reduce_sum(self.cross_entropy_with_sample_weights)
+            # self.optim = tf.train.AdamOptimizer(learning_rate=self.config.learning_rate).minimize(self.loss)
+            self.optim = tf.train.AdamOptimizer(learning_rate=self.config.learning_rate).minimize(self.loss_with_sample_weights)
+            ##### 添加样本权重 #####
             
         with tf.name_scope('accuracy'):
             correct_pred = tf.equal(tf.argmax(self.input_y, 1), self.y_pred_cls)
