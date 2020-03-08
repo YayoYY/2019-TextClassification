@@ -87,7 +87,7 @@ class LGB(Classifier):
                                                             reg_lambda=0.25,
                                                             max_depth=-1, 
                                                             learning_rate=0.05,
-                                                            min_child_sample=5,
+                                                            min_child_samples=5,
                                                             n_estimators=200,
                                                             subsample=0.9,
                                                             colsample_bytree=0.7, 

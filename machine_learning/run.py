@@ -1,8 +1,8 @@
 import numpy as np
 import pandas as pd
 from sklearn.metrics import f1_score, classification_report
-from sklearn.feature_selection import SelectKBest, f_classif, chi2
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_selection import SelectKBest, chi2
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from ml_model import *
 import warnings
 warnings.filterwarnings('ignore')
@@ -19,28 +19,42 @@ def get_feature(max_features=5000, max_df=0.8, analyzer='word', ngram_range=(1,1
     print('训练集维度：', train.shape)
     print('测试集维度：', test.shape)
 
-    print('>>> tf-idf 计算特征权重...')
+    print('>>> 建立词汇表，进行CountVectorize...')
     if analyzer == 'char':
         train.words = train.words.apply(lambda x: x.replace(' ', ''))
         test.words = test.words.apply(lambda x: x.replace(' ', ''))
-    tfidfer = TfidfVectorizer(max_features=max_features, max_df=max_df, analyzer=analyzer, ngram_range=ngram_range)
+        cver = CountVectorizer(analyzer='char',
+                               max_df=0.3,
+                               min_df=0.001,
+                               ngram_range=ngram_range)
+    else:
+        cver = CountVectorizer(max_df=0.3,
+                               min_df=0.001,
+                               ngram_range=ngram_range) # 先用文档频率过滤一下
+    count_array = cver.fit_transform(train['words'])
+    feature_names = cver.get_feature_names()
+    n_vocabs = len(feature_names)
+    print("词汇表数量：", n_vocabs)
+
+    print('>>> chi2特征选择')
+    selector = SelectKBest(chi2, k=500)
+    train_feature = selector.fit_transform(count_array, train['accusation'])
+    select_feature_names_bool = selector.get_support().tolist()
+    select_feature_names = [feature_names[i] for i, item in enumerate(select_feature_names_bool) if item == 1]
+    print('特征：', select_feature_names[:20])
+
+    print('>>> tf-idf 计算特征权重...')
+    tfidfer = TfidfVectorizer(max_features=max_features,
+                              max_df=max_df,
+                              analyzer=analyzer,
+                              ngram_range=ngram_range,
+                              vocabulary=select_feature_names)
     tfidfer.fit(train.words)
     feature_names = tfidfer.get_feature_names()
     tfidf = tfidfer.transform(train.words)
     train_feature = tfidf.toarray()
     tfidf = tfidfer.transform(test.words)
     test_feature = tfidf.toarray()
-    print('特征：', feature_names[:20])
-    print('训练集维度：', train_feature.shape)
-    print('测试集维度：', test_feature.shape)
-    
-    print('>>> 特征选择...')
-    selector = SelectKBest(chi2, k=num_features)
-    train_feature = selector.fit_transform(train_feature, train['accusation'])
-    selected_features = selector.inverse_transform(train_feature)
-    selected_columns = np.where(~(selector.inverse_transform(train_feature) == 0).all(axis=0))[0]
-    test_feature = test_feature[:, selected_columns]
-    print('选择后的特征：', [feature_names[i] for i in selected_columns])
     print('训练集维度：', train_feature.shape)
     print('测试集维度：', test_feature.shape)
     
@@ -55,7 +69,8 @@ def experiments(analyzer='word', ngram_range=(1,1)):
     
     train, test, train_feature, test_feature, feature_names = get_feature(analyzer=analyzer, ngram_range=ngram_range, num_features=500)
 
-    classifiers = [LR(), SVM(), LGB()]
+    # classifiers = [LR(), SVM(), LGB()]
+    classifiers = [LGB()]
     for model in classifiers:
         print('-----------------------%s-----------------------' % model.name)
         print('>>> 模型训练...')
@@ -72,6 +87,6 @@ def experiments(analyzer='word', ngram_range=(1,1)):
         print('宏F1与微F1的均值：', score)
 
 if __name__ == '__main__':
-    experiments(analyzer='word', ngram_range=(1,1)) # 分词
+    # experiments(analyzer='word', ngram_range=(1,1)) # 分词
     experiments(analyzer='char', ngram_range=(2,2)) # 二字串
-    experiments(analyzer='char', ngram_range=(2,3)) # 三字串
+    # experiments(analyzer='char', ngram_range=(2,3)) # 三字串
